@@ -1,19 +1,83 @@
-import { useState } from 'react'
-import { Upload, Search, Code, Loader2 } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Upload, Search, Code, Loader2, Github, Trash2 } from 'lucide-react'
 import axios from 'axios'
 import './App.css'
 
 function App() {
   const [repoFile, setRepoFile] = useState(null)
+  const [githubUrl, setGithubUrl] = useState('')
   const [repoId, setRepoId] = useState(localStorage.getItem('repoId') || '')
+  const [repoName, setRepoName] = useState(localStorage.getItem('repoName') || '')
   const [uploadStatus, setUploadStatus] = useState('')
   const [uploadProgress, setUploadProgress] = useState(0)
   const [question, setQuestion] = useState('')
   const [answer, setAnswer] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [retrievedContext, setRetrievedContext] = useState([])
+  const [repos, setRepos] = useState([])
 
   const API_URL = "http://localhost:8000"
+
+  // Fetch all repos on mount
+  useEffect(() => {
+    fetchRepos()
+  }, [])
+
+  const fetchRepos = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/repos`)
+      console.log('Repos response:', res.data)
+      const repoList = res.data.repos || res.data || []
+      console.log('Repo list:', repoList)
+      setRepos(Array.isArray(repoList) ? repoList : [])
+    } catch (error) {
+      console.error('Failed to fetch repos:', error)
+    }
+  }
+
+  const selectRepo = (repo) => {
+    setRepoId(repo.id)
+    setRepoName(repo.name)
+    localStorage.setItem('repoId', repo.id)
+    localStorage.setItem('repoName', repo.name)
+    setShowRepoList(false)
+    setAnswer('')
+    setRetrievedContext([])
+    setUploadStatus(`Switched to: ${repo.name}`)
+  }
+
+  const handleDeleteRepo = async (repoIdToDelete, repoNameToDelete) => {
+    if (!window.confirm(`Are you sure you want to delete "${repoNameToDelete}"? This will remove all indexed data.`)) return
+
+    try {
+      await axios.delete(`${API_URL}/repos/${repoIdToDelete}`)
+      
+      // If we deleted the active repo, clear it
+      if (repoIdToDelete === repoId) {
+        setRepoId('')
+        setRepoName('')
+        localStorage.removeItem('repoId')
+        localStorage.removeItem('repoName')
+        setAnswer('')
+        setRetrievedContext([])
+      }
+      
+      setUploadStatus(`Deleted: ${repoNameToDelete}`)
+      fetchRepos() // Refresh list
+    } catch (error) {
+      setUploadStatus(`Error deleting repo: ${error.response?.data?.detail || error.message}`)
+    }
+  }
+
+  const handleClearActiveRepo = () => {
+    setRepoId('')
+    setRepoName('')
+    localStorage.removeItem('repoId')
+    localStorage.removeItem('repoName')
+    setAnswer('')
+    setRetrievedContext([])
+    setUploadStatus('Cleared active repository.')
+  }
 
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -44,8 +108,11 @@ function App() {
         })
         
         const newRepoId = uploadRes.data.repo_id
+        const newRepoName = uploadRes.data.repo_name || repoFile.name
         setRepoId(newRepoId)
+        setRepoName(newRepoName)
         localStorage.setItem('repoId', newRepoId)
+        localStorage.setItem('repoName', newRepoName)
         
         setUploadStatus('Extracting & indexing code... (this may take a minute)')
         
@@ -53,9 +120,39 @@ function App() {
         await axios.post(`${API_URL}/index-code?repo_id=${newRepoId}`)
         
         setUploadStatus('Indexing started in the background. You can start asking questions!')
+        fetchRepos() // Refresh list
     } catch (error) {
         setUploadStatus(`Error: ${error.response?.data?.detail || error.message}`)
         setUploadProgress(0)
+    }
+  }
+
+  const handleGithubUpload = async (e) => {
+    e.preventDefault()
+    if (!githubUrl.trim()) return
+
+    setUploadStatus('Cloning repository...')
+    try {
+        const uploadRes = await axios.post(`${API_URL}/upload-github-repo`, {
+            url: githubUrl
+        })
+        
+        const newRepoId = uploadRes.data.repo_id
+        const newRepoName = uploadRes.data.repo_name || githubUrl.split('/').pop()
+        setRepoId(newRepoId)
+        setRepoName(newRepoName)
+        localStorage.setItem('repoId', newRepoId)
+        localStorage.setItem('repoName', newRepoName)
+        
+        setUploadStatus('Indexing code from GitHub... (this may take a minute)')
+        
+        await axios.post(`${API_URL}/index-code?repo_id=${newRepoId}`)
+        
+        setUploadStatus('Indexing started. You can start asking questions!')
+        setGithubUrl('') // clear input
+        fetchRepos() // Refresh list
+    } catch (error) {
+        setUploadStatus(`Error: ${error.response?.data?.detail || error.message}`)
     }
   }
 
@@ -64,7 +161,7 @@ function App() {
     
     if (!question.trim()) return
     if (!repoId) {
-        setAnswer('Please upload a repository first before asking questions.')
+        setAnswer('Please upload or select a repository first before asking questions.')
         return
     }
 
@@ -105,14 +202,60 @@ function App() {
       {/* Main Content */}
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 flex flex-col lg:flex-row gap-8">
         
-        {/* Left Column: Upload */}
+        {/* Left Column: Upload + Repo Management */}
         <section className="w-full lg:w-1/3 flex flex-col gap-6">
+
+          {/* Active Repo Dropdown */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 transition-all hover:shadow-md">
+            <h2 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+              <Code className="w-5 h-5 text-green-500" />
+              Active Repository
+            </h2>
+            
+            <div className="flex items-center gap-2">
+              <select
+                value={repoId}
+                onChange={(e) => {
+                  const selected = repos.find(r => r.id === e.target.value)
+                  if (selected) {
+                    selectRepo(selected)
+                  } else {
+                    handleClearActiveRepo()
+                  }
+                }}
+                className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all appearance-none cursor-pointer"
+              >
+                <option value="">-- Select a repository --</option>
+                {repos.map((repo) => (
+                  <option key={repo.id} value={repo.id}>{repo.name}</option>
+                ))}
+              </select>
+              {repoId && (
+                <button
+                  onClick={() => {
+                    const activeRepo = repos.find(r => r.id === repoId)
+                    if (activeRepo) handleDeleteRepo(activeRepo.id, activeRepo.name)
+                  }}
+                  className="text-red-400 hover:text-red-600 transition-colors p-2 hover:bg-red-50 rounded-xl border border-transparent hover:border-red-200 flex-shrink-0"
+                  title="Delete this repository"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+            {repos.length === 0 && (
+              <p className="text-sm text-slate-400 text-center mt-3">No repositories yet. Upload one below.</p>
+            )}
+          </div>
+
+          {/* Upload Card */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 transition-all hover:shadow-md">
             <h2 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
               <Upload className="w-5 h-5 text-blue-500" />
-              1. Upload Repository
+              Add Repository
             </h2>
-            <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:bg-slate-50 transition-colors cursor-pointer relative group">
+            {/* ZIP Upload */}
+            <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:bg-slate-50 transition-colors cursor-pointer relative group mb-4">
               <input 
                 type="file" 
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
@@ -128,21 +271,49 @@ function App() {
               </div>
             </div>
             
+            <button 
+               onClick={handleUpload}
+               disabled={!repoFile || uploadProgress > 0}
+               className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-xl transition-all active:scale-[0.98] shadow-sm disabled:opacity-50 mb-6"
+            >
+              Upload & Index ZIP
+            </button>
+
+            <div className="relative flex items-center py-2 mb-4">
+              <div className="flex-grow border-t border-slate-200"></div>
+              <span className="flex-shrink-0 mx-4 text-slate-400 text-sm font-medium">OR</span>
+              <div className="flex-grow border-t border-slate-200"></div>
+            </div>
+
+            {/* GitHub Upload */}
+            <form onSubmit={handleGithubUpload} className="flex flex-col gap-3">
+              <div className="relative flex items-center">
+                <Github className="absolute left-3 w-5 h-5 text-slate-400" />
+                <input 
+                  type="url" 
+                  value={githubUrl}
+                  onChange={(e) => setGithubUrl(e.target.value)}
+                  placeholder="https://github.com/user/repo" 
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 pl-10 pr-4 text-slate-900 focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all shadow-inner text-sm"
+                />
+              </div>
+              <button 
+                 type="submit"
+                 disabled={!githubUrl || uploadProgress > 0}
+                 className="w-full bg-slate-800 hover:bg-slate-900 text-white font-medium py-2.5 rounded-xl transition-all active:scale-[0.98] shadow-sm disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                <Github className="w-5 h-5" />
+                Fetch GitHub Repo
+              </button>
+            </form>
+            
             {uploadProgress > 0 && uploadProgress < 100 && (
-                <div className="w-full bg-slate-200 rounded-full h-2.5 mt-4">
+                <div className="w-full bg-slate-200 rounded-full h-2.5 mt-6">
                   <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${uploadProgress}%` }}></div>
                 </div>
             )}
             
-            <button 
-               onClick={handleUpload}
-               disabled={!repoFile || uploadProgress > 0}
-               className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-xl transition-all active:scale-[0.98] shadow-sm disabled:opacity-50"
-            >
-              Upload & Index Code
-            </button>
-            {uploadStatus && <p className="mt-3 text-sm text-center text-slate-600 font-medium">{uploadStatus}</p>}
-            {repoId && <p className="mt-1 text-xs text-center text-green-600 font-medium font-mono truncate">Active Repo ID: {repoId}</p>}
+            {uploadStatus && <p className="mt-4 text-sm text-center text-slate-600 font-medium">{uploadStatus}</p>}
           </div>
         </section>
 
@@ -151,7 +322,8 @@ function App() {
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex-1 flex flex-col transition-all hover:shadow-md">
             <h2 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
               <Search className="w-5 h-5 text-indigo-500" />
-              2. Ask Questions
+              Ask Questions
+              {repoName && <span className="text-sm font-normal text-slate-400 ml-auto">Querying: <span className="text-indigo-500 font-medium">{repoName}</span></span>}
             </h2>
             
             <div className="flex-1 min-h-[300px] border border-slate-200 rounded-xl bg-slate-50 mb-4 p-5 overflow-auto">
