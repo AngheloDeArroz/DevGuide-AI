@@ -1,9 +1,13 @@
-import { useState, useEffect } from 'react'
-import { Upload, Search, Code, Loader2, Github, Trash2 } from 'lucide-react'
+import { useState, useEffect, useMemo } from 'react'
+import { Upload, Search, Code, Loader2, Github, Trash2, LogOut, User } from 'lucide-react'
 import axios from 'axios'
+import { useAuth } from './AuthProvider'
+import AuthPage from './AuthPage'
 import './App.css'
 
 function App() {
+  const { session, user, loading, signOut } = useAuth()
+
   const [repoFile, setRepoFile] = useState(null)
   const [githubUrl, setGithubUrl] = useState('')
   const [repoId, setRepoId] = useState(localStorage.getItem('repoId') || '')
@@ -18,14 +22,29 @@ function App() {
 
   const API_URL = "http://localhost:8000"
 
-  // Fetch all repos on mount
+  // Authenticated axios instance — automatically attaches JWT
+  const api = useMemo(() => {
+    const instance = axios.create({ baseURL: API_URL })
+    instance.interceptors.request.use((config) => {
+      const token = session?.access_token
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`
+      }
+      return config
+    })
+    return instance
+  }, [session])
+
+  // Fetch all repos on mount & when session changes
   useEffect(() => {
-    fetchRepos()
-  }, [])
+    if (session) {
+      fetchRepos()
+    }
+  }, [session])
 
   const fetchRepos = async () => {
     try {
-      const res = await axios.get(`${API_URL}/repos`)
+      const res = await api.get('/repos')
       console.log('Repos response:', res.data)
       const repoList = res.data.repos || res.data || []
       console.log('Repo list:', repoList)
@@ -40,7 +59,6 @@ function App() {
     setRepoName(repo.name)
     localStorage.setItem('repoId', repo.id)
     localStorage.setItem('repoName', repo.name)
-    setShowRepoList(false)
     setAnswer('')
     setRetrievedContext([])
     setUploadStatus(`Switched to: ${repo.name}`)
@@ -50,7 +68,7 @@ function App() {
     if (!window.confirm(`Are you sure you want to delete "${repoNameToDelete}"? This will remove all indexed data.`)) return
 
     try {
-      await axios.delete(`${API_URL}/repos/${repoIdToDelete}`)
+      await api.delete(`/repos/${repoIdToDelete}`)
       
       // If we deleted the active repo, clear it
       if (repoIdToDelete === repoId) {
@@ -99,7 +117,7 @@ function App() {
 
     try {
         // 1. Upload ZIP
-        const uploadRes = await axios.post(`${API_URL}/upload-repo`, formData, {
+        const uploadRes = await api.post('/upload-repo', formData, {
             headers: { 'Content-Type': 'multipart/form-data' },
             onUploadProgress: (progressEvent) => {
                 const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total)
@@ -117,7 +135,7 @@ function App() {
         setUploadStatus('Extracting & indexing code... (this may take a minute)')
         
         // 2. Trigger Indexing
-        await axios.post(`${API_URL}/index-code?repo_id=${newRepoId}`)
+        await api.post(`/index-code?repo_id=${newRepoId}`)
         
         setUploadStatus('Indexing started in the background. You can start asking questions!')
         fetchRepos() // Refresh list
@@ -133,7 +151,7 @@ function App() {
 
     setUploadStatus('Cloning repository...')
     try {
-        const uploadRes = await axios.post(`${API_URL}/upload-github-repo`, {
+        const uploadRes = await api.post('/upload-github-repo', {
             url: githubUrl
         })
         
@@ -146,7 +164,7 @@ function App() {
         
         setUploadStatus('Indexing code from GitHub... (this may take a minute)')
         
-        await axios.post(`${API_URL}/index-code?repo_id=${newRepoId}`)
+        await api.post(`/index-code?repo_id=${newRepoId}`)
         
         setUploadStatus('Indexing started. You can start asking questions!')
         setGithubUrl('') // clear input
@@ -170,7 +188,7 @@ function App() {
     setRetrievedContext([])
 
     try {
-        const res = await axios.post(`${API_URL}/ask`, {
+        const res = await api.post('/ask', {
             question: question,
             repo_id: repoId
         })
@@ -184,6 +202,29 @@ function App() {
         setQuestion('') // clear input
     }
   }
+
+  const handleSignOut = async () => {
+    await signOut()
+    setRepos([])
+    setRepoId('')
+    setRepoName('')
+    setAnswer('')
+    setRetrievedContext([])
+  }
+
+  // Show loading spinner while checking auth
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    )
+  }
+
+  // Show auth page if not logged in
+  if (!session) {
+    return <AuthPage />
+  }
   
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
@@ -195,6 +236,22 @@ function App() {
               <Code className="text-white w-6 h-6" />
             </div>
             <h1 className="text-2xl font-bold text-slate-900 tracking-tight">DevGuide AI</h1>
+          </div>
+
+          {/* User Info + Logout */}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 text-sm text-slate-500 bg-slate-100 px-3 py-2 rounded-xl">
+              <User className="w-4 h-4" />
+              <span className="hidden sm:inline max-w-[200px] truncate">{user?.email}</span>
+            </div>
+            <button
+              onClick={handleSignOut}
+              className="flex items-center gap-2 text-sm text-slate-500 hover:text-red-600 bg-slate-100 hover:bg-red-50 px-3 py-2 rounded-xl transition-all border border-transparent hover:border-red-200"
+              title="Sign out"
+            >
+              <LogOut className="w-4 h-4" />
+              <span className="hidden sm:inline">Sign Out</span>
+            </button>
           </div>
         </div>
       </header>
