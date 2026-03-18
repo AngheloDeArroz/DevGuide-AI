@@ -16,3 +16,4 @@ tree-sitter-cpp
 python-dotenv
 httpx
 pydantic
+PyJWT
