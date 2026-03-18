@@ -9,6 +9,7 @@ import pydantic
 import stat
 import logging
 import traceback
+import json
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from pathlib import Path
@@ -269,7 +270,6 @@ async def ask_question(
         raise HTTPException(status_code=404, detail="Repository not found or access denied.")
 
     try:
-        # 1. Semantic Search
         logger.info(f"[ask] Running semantic search...")
         relevant_chunks = semantic_search(db, request.question, request.repo_id, limit=5)
         logger.info(f"[ask] Found {len(relevant_chunks)} relevant chunks")
@@ -277,7 +277,6 @@ async def ask_question(
         if not relevant_chunks:
             return {"answer": "No relevant code found in this repository for your question.", "context": []}
         
-        # 2. Ask LLM
         logger.info(f"[ask] Sending to Gemini LLM...")
         answer = generate_explanation(request.question, relevant_chunks)
         logger.info(f"[ask] ✅ Got LLM response ({len(answer)} chars)")
@@ -286,6 +285,162 @@ async def ask_question(
     except Exception as e:
         logger.error(f"[ask] ❌ Error: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Error processing question: {str(e)}")
+
+
+# ─── Conversation endpoints ────────────────────────────────────────────────────
+
+class ConversationCreateRequest(pydantic.BaseModel):
+    repo_id: str
+    title: str = "New Conversation"
+
+@app.post("/conversations")
+async def create_conversation(
+    request: ConversationCreateRequest,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user)
+):
+    """Creates a new conversation for the authenticated user and a given repo."""
+    # Verify repo ownership
+    repo_check = db.execute(
+        text("SELECT id FROM repositories WHERE id = :repo_id AND user_id = :user_id"),
+        {"repo_id": request.repo_id, "user_id": user_id}
+    ).fetchone()
+    if not repo_check:
+        raise HTTPException(status_code=404, detail="Repository not found or access denied.")
+
+    conv_id = str(uuid.uuid4())
+    db.execute(
+        text("INSERT INTO conversations (id, user_id, repository_id, title) VALUES (:id, :user_id, :repo_id, :title)"),
+        {"id": conv_id, "user_id": user_id, "repo_id": request.repo_id, "title": request.title}
+    )
+    db.commit()
+    logger.info(f"[conversations] Created conversation id={conv_id} for user={user_id}, repo={request.repo_id}")
+    return {"id": conv_id, "title": request.title, "repo_id": request.repo_id}
+
+
+@app.get("/conversations")
+async def list_conversations(
+    repo_id: str,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user)
+):
+    """Lists all conversations for the authenticated user in a given repo, newest first."""
+    rows = db.execute(
+        text("""
+            SELECT id, title, created_at, updated_at
+            FROM conversations
+            WHERE user_id = :user_id AND repository_id = :repo_id
+            ORDER BY updated_at DESC
+        """),
+        {"user_id": user_id, "repo_id": repo_id}
+    ).fetchall()
+
+    conversations = [
+        {"id": str(r.id), "title": r.title, "created_at": r.created_at.isoformat(), "updated_at": r.updated_at.isoformat()}
+        for r in rows
+    ]
+    return {"conversations": conversations}
+
+
+@app.get("/conversations/{conversation_id}/messages")
+async def get_messages(
+    conversation_id: str,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user)
+):
+    """Returns all messages for a conversation, verifying ownership."""
+    # Verify ownership via conversations table
+    conv = db.execute(
+        text("SELECT id FROM conversations WHERE id = :id AND user_id = :user_id"),
+        {"id": conversation_id, "user_id": user_id}
+    ).fetchone()
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found or access denied.")
+
+    rows = db.execute(
+        text("SELECT id, role, content, context, created_at FROM messages WHERE conversation_id = :conv_id ORDER BY created_at ASC"),
+        {"conv_id": conversation_id}
+    ).fetchall()
+
+    messages = [
+        {"id": str(r.id), "role": r.role, "content": r.content, "context": r.context or [], "created_at": r.created_at.isoformat()}
+        for r in rows
+    ]
+    return {"messages": messages}
+
+
+class ConversationAskRequest(pydantic.BaseModel):
+    question: str
+
+@app.post("/conversations/{conversation_id}/ask")
+async def ask_in_conversation(
+    conversation_id: str,
+    request: ConversationAskRequest,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user)
+):
+    """Ask a question in a conversation. Saves user message + AI response to DB."""
+    # Verify conversation ownership and get repo_id
+    conv = db.execute(
+        text("SELECT id, repository_id FROM conversations WHERE id = :id AND user_id = :user_id"),
+        {"id": conversation_id, "user_id": user_id}
+    ).fetchone()
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found or access denied.")
+
+    repo_id = str(conv.repository_id)
+    logger.info(f"[conv-ask] conv={conversation_id} | question='{request.question}' | user={user_id}")
+
+    try:
+        # 1. Semantic search
+        relevant_chunks = semantic_search(db, request.question, repo_id, limit=5)
+
+        if not relevant_chunks:
+            answer = "No relevant code found in this repository for your question."
+            relevant_chunks = []
+        else:
+            # 2. LLM
+            answer = generate_explanation(request.question, relevant_chunks)
+
+        # 3. Save user message
+        db.execute(
+            text("INSERT INTO messages (id, conversation_id, role, content) VALUES (:id, :conv_id, 'user', :content)"),
+            {"id": str(uuid.uuid4()), "conv_id": conversation_id, "content": request.question}
+        )
+
+        # 4. Save assistant message (with retrieved context)
+        db.execute(
+            text("INSERT INTO messages (id, conversation_id, role, content, context) VALUES (:id, :conv_id, 'assistant', :content, :context)"),
+            {"id": str(uuid.uuid4()), "conv_id": conversation_id, "content": answer, "context": json.dumps(relevant_chunks)}
+        )
+
+        # 5. Update conversation updated_at and auto-title from first question
+        msg_count = db.execute(
+            text("SELECT COUNT(*) FROM messages WHERE conversation_id = :conv_id"),
+            {"conv_id": conversation_id}
+        ).scalar()
+
+        if msg_count <= 2:  # just inserted the first pair
+            short_title = request.question[:60] + ("…" if len(request.question) > 60 else "")
+            db.execute(
+                text("UPDATE conversations SET title = :title, updated_at = now() WHERE id = :id"),
+                {"title": short_title, "id": conversation_id}
+            )
+        else:
+            db.execute(
+                text("UPDATE conversations SET updated_at = now() WHERE id = :id"),
+                {"id": conversation_id}
+            )
+
+        db.commit()
+        logger.info(f"[conv-ask] ✅ Saved Q&A pair to conversation={conversation_id}")
+
+        return {"answer": answer, "context": relevant_chunks}
+
+    except Exception as e:
+        logger.error(f"[conv-ask] ❌ Error: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Error processing question: {str(e)}")
+
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
