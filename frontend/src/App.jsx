@@ -3,15 +3,17 @@ import {
   Upload, Code, Loader2, Github, Trash2, 
   LogOut, User, Plus, MessageSquare, ChevronRight, X,
   SendHorizontal, ChevronDown, Database, PanelLeftClose, PanelLeftOpen,
-  Menu
+  Menu, Sun, Moon
 } from 'lucide-react'
 import axios from 'axios'
 import { useAuth } from './AuthProvider'
 import AuthPage from './AuthPage'
+import { useTheme } from './ThemeContext'
 import './App.css'
 
 function App() {
   const { session, user, loading, signOut } = useAuth()
+  const { theme, toggleTheme } = useTheme()
 
   // UI State
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
@@ -36,7 +38,10 @@ function App() {
   const [isLoading, setIsLoading] = useState(false)
 
   const messagesEndRef = useRef(null)
-  const API_URL = "http://localhost:8000"
+  // Use a relative base URL so requests go through Vite's dev server proxy.
+  // Locally: Vite proxies /api-paths → http://localhost:8000 (transparent, still works).
+  // In Docker: Vite proxies /api-paths → http://backend:8000 (the Docker service name).
+  const API_URL = ""
 
   // Authenticated axios instance
   const api = useMemo(() => {
@@ -325,7 +330,7 @@ function App() {
   if (!session) return <AuthPage />
 
   return (
-    <div className="flex h-screen bg-white text-slate-800 font-sans overflow-hidden">
+    <div className="flex h-screen bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 font-sans overflow-hidden">
       
       {/* Mobile overlay */}
       {isSidebarOpen && (
@@ -339,31 +344,33 @@ function App() {
       <aside className={`
         fixed md:relative z-30
         h-full flex flex-col flex-shrink-0
-        bg-slate-50 border-r border-slate-200
+        bg-slate-50 dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700
         transition-all duration-300 ease-in-out
         ${isSidebarOpen ? 'w-72 translate-x-0' : 'w-0 md:w-16 -translate-x-full md:translate-x-0'}
         overflow-hidden
       `}>
 
         {/* Logo & App Name + Collapse Button */}
-        <div className="p-4 flex items-center border-b border-slate-200" style={{ minWidth: isSidebarOpen ? '18rem' : '4rem' }}>
+        <div className="p-4 flex items-center border-b border-slate-200 dark:border-slate-700" style={{ minWidth: isSidebarOpen ? '18rem' : '4rem' }}>
           {/* Logo icon — always visible */}
           <div className="bg-blue-600 p-2 rounded-lg flex-shrink-0">
             <Code className="text-white w-5 h-5" />
           </div>
           {/* Title — only when expanded */}
-          <h1 className={`text-xl font-bold text-slate-900 tracking-tight whitespace-nowrap ml-3 transition-all duration-200 overflow-hidden ${isSidebarOpen ? 'opacity-100 max-w-xs' : 'opacity-0 max-w-0 ml-0'}`}>
+          <h1 className={`text-xl font-bold text-slate-900 dark:text-slate-100 tracking-tight whitespace-nowrap ml-3 transition-all duration-200 overflow-hidden ${isSidebarOpen ? 'opacity-100 max-w-xs' : 'opacity-0 max-w-0 ml-0'}`}>
             DevGuide AI
           </h1>
-          {/* Toggle button — only on desktop, pushed to the right */}
+          {/* Collapse button — only on desktop when expanded */}
           {isSidebarOpen && (
-            <button
-              onClick={() => setIsSidebarOpen(false)}
-              className="ml-auto p-1.5 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition-colors hidden md:flex flex-shrink-0"
-              title="Collapse sidebar"
-            >
-              <PanelLeftClose className="w-4 h-4" />
-            </button>
+            <div className="ml-auto flex items-center gap-0.5 flex-shrink-0">
+              <button
+                onClick={() => setIsSidebarOpen(false)}
+                className="p-1.5 rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors hidden md:flex"
+                title="Collapse sidebar"
+              >
+                <PanelLeftClose className="w-4 h-4" />
+              </button>
+            </div>
           )}
         </div>
 
@@ -371,9 +378,9 @@ function App() {
         <div className={`flex flex-col flex-1 overflow-hidden transition-opacity duration-200 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
           
           {/* Repository Selector */}
-          <div className="p-4 border-b border-slate-200 flex flex-col gap-3">
+          <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex flex-col gap-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Workspace</span>
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Workspace</span>
               <button 
                 onClick={() => setIsUploadModalOpen(true)}
                 className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 p-1 rounded-md transition-colors"
@@ -388,14 +395,14 @@ function App() {
               <button
                 type="button"
                 onClick={() => setIsRepoDropdownOpen(v => !v)}
-                className={`w-full flex items-center gap-2 bg-white border rounded-xl px-3 py-2.5 text-sm text-left transition-all shadow-sm
+                className={`w-full flex items-center gap-2 bg-white dark:bg-slate-700 border rounded-xl px-3 py-2.5 text-sm text-left transition-all shadow-sm
                   ${isRepoDropdownOpen 
-                    ? 'border-blue-500 ring-2 ring-blue-200' 
-                    : 'border-slate-200 hover:border-slate-300'
+                    ? 'border-blue-500 ring-2 ring-blue-200 dark:ring-blue-800' 
+                    : 'border-slate-200 dark:border-slate-600 hover:border-slate-300 dark:hover:border-slate-500'
                   }`}
               >
                 <Database className={`w-4 h-4 flex-shrink-0 ${repoId ? 'text-blue-600' : 'text-slate-400'}`} />
-                <span className={`flex-1 truncate ${repoId ? 'text-slate-900 font-medium' : 'text-slate-400'}`}>
+                <span className={`flex-1 truncate ${repoId ? 'text-slate-900 dark:text-slate-100 font-medium' : 'text-slate-400 dark:text-slate-500'}`}>
                   {repoName || 'Select a repository'}
                 </span>
                 <ChevronDown className={`w-4 h-4 flex-shrink-0 text-slate-400 transition-transform duration-200 ${isRepoDropdownOpen ? 'rotate-180' : ''}`} />
@@ -403,25 +410,25 @@ function App() {
 
               {/* Dropdown list */}
               {isRepoDropdownOpen && (
-                <div className="absolute top-full left-0 right-0 mt-1.5 bg-white border border-slate-200 rounded-xl shadow-lg z-40 overflow-hidden">
+                <div className="absolute top-full left-0 right-0 mt-1.5 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl shadow-lg z-40 overflow-hidden">
                   {/* Clear selection */}
                   <button
                     onClick={() => { handleClearActiveRepo(); setIsRepoDropdownOpen(false) }}
-                    className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-slate-500 hover:bg-slate-50 transition-colors border-b border-slate-100"
+                    className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors border-b border-slate-100 dark:border-slate-600"
                   >
                     <X className="w-3.5 h-3.5" />
                     <span>None</span>
                   </button>
 
                   {repos.length === 0 ? (
-                    <div className="px-3 py-4 text-center text-xs text-slate-400">No repositories yet</div>
+                    <div className="px-3 py-4 text-center text-xs text-slate-400 dark:text-slate-500">No repositories yet</div>
                   ) : (
                     <div className="max-h-48 overflow-y-auto">
                       {repos.map((repo) => (
                         <div
                           key={repo.id}
                           className={`flex items-center gap-2 px-3 py-2.5 cursor-pointer transition-colors group
-                            ${repo.id === repoId ? 'bg-blue-50 text-blue-700' : 'hover:bg-slate-50 text-slate-700'}`}
+                            ${repo.id === repoId ? 'bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300' : 'hover:bg-slate-50 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200'}`}
                         >
                           <button
                             className="flex-1 flex items-center gap-2 text-sm text-left min-w-0"
@@ -445,7 +452,7 @@ function App() {
                   {/* Add new */}
                   <button
                     onClick={() => { setIsUploadModalOpen(true); setIsRepoDropdownOpen(false) }}
-                    className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-blue-600 hover:bg-blue-50 transition-colors border-t border-slate-100 font-medium"
+                    className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors border-t border-slate-100 dark:border-slate-600 font-medium"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     <span>Add repository</span>
@@ -460,7 +467,7 @@ function App() {
             <button
               onClick={handleNewConversation}
               disabled={!repoId}
-              className="w-full flex items-center justify-center gap-2 bg-white border border-slate-200 hover:border-blue-400 hover:text-blue-600 text-slate-700 text-sm font-medium py-2 rounded-lg transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full flex items-center justify-center gap-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 hover:border-blue-400 hover:text-blue-600 text-slate-700 dark:text-slate-200 text-sm font-medium py-2 rounded-lg transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Plus className="w-4 h-4" />
               New Chat
@@ -469,11 +476,11 @@ function App() {
 
           {/* Conversations List */}
           <div className="flex-1 overflow-y-auto px-3">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-1 mb-2 block">Recent</span>
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider px-1 mb-2 block">Recent</span>
             {!repoId ? (
-              <p className="text-xs text-slate-400 text-center mt-6">Select a repo to see chats</p>
+              <p className="text-xs text-slate-400 dark:text-slate-500 text-center mt-6">Select a repo to see chats</p>
             ) : conversations.length === 0 ? (
-              <p className="text-xs text-slate-400 text-center mt-6">No conversations yet.</p>
+              <p className="text-xs text-slate-400 dark:text-slate-500 text-center mt-6">No conversations yet.</p>
             ) : (
               <div className="flex flex-col gap-1">
                 {conversations.map((conv) => (
@@ -481,8 +488,8 @@ function App() {
                     key={conv.id}
                     className={`group w-full flex items-center gap-2 rounded-lg transition-all cursor-pointer
                       ${activeConvId === conv.id
-                        ? 'bg-blue-100 text-blue-700'
-                        : 'hover:bg-slate-200 text-slate-600'
+                        ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300'
+                        : 'hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300'
                       }`}
                   >
                     <button
@@ -509,11 +516,11 @@ function App() {
           </div>
 
           {/* User Profile & Logout */}
-          <div className="p-4 border-t border-slate-200 bg-slate-50">
+          <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-sm text-slate-600 overflow-hidden">
-                <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-                  <User className="w-3.5 h-3.5 text-blue-600" />
+              <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 overflow-hidden">
+                <div className="w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center flex-shrink-0">
+                  <User className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                 </div>
                 <span className="truncate text-xs">{user?.email}</span>
               </div>
@@ -530,9 +537,9 @@ function App() {
       </aside>
 
       {/* MAIN CHAT AREA */}
-      <main className="flex-1 flex flex-col h-full relative bg-white min-w-0">
+      <main className="flex-1 flex flex-col h-full relative bg-white dark:bg-slate-900 min-w-0">
         {/* Chat Header */}
-        <header className="h-14 md:h-16 border-b border-slate-100 flex items-center px-3 md:px-6 justify-between flex-shrink-0 gap-2">
+        <header className="h-14 md:h-16 border-b border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-900 flex items-center px-3 md:px-6 justify-between flex-shrink-0 gap-2">
           <div className="flex items-center gap-2 md:gap-3 min-w-0">
             {/* Mobile hamburger */}
             <button
@@ -551,7 +558,7 @@ function App() {
                 <PanelLeftOpen className="w-4 h-4" />
               </button>
             )}
-            <h2 className="text-base md:text-lg font-semibold text-slate-800 flex items-center gap-2 min-w-0">
+            <h2 className="text-base md:text-lg font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2 min-w-0">
               {repoName ? (
                 <>
                   <Code className="w-4 h-4 md:w-5 md:h-5 text-indigo-500 flex-shrink-0" />
@@ -563,24 +570,35 @@ function App() {
             </h2>
           </div>
           
-          {/* Quick action: add repo on mobile */}
-          <button
-            onClick={() => setIsUploadModalOpen(true)}
-            className="md:hidden p-2 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors flex-shrink-0"
-            title="Add Repository"
-          >
-            <Plus className="w-5 h-5" />
-          </button>
+          {/* Header right actions */}
+          <div className="flex items-center gap-1 flex-shrink-0">
+            {/* Quick action: add repo on mobile */}
+            <button
+              onClick={() => setIsUploadModalOpen(true)}
+              className="md:hidden p-2 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors"
+              title="Add Repository"
+            >
+              <Plus className="w-5 h-5" />
+            </button>
+            {/* Dark/Light mode toggle — always visible top-right */}
+            <button
+              onClick={toggleTheme}
+              className="p-2 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            </button>
+          </div>
         </header>
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col gap-6">
           {messages.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center text-slate-400 gap-4 mt-20">
-              <div className="bg-slate-50 p-4 rounded-full">
-                <Code className="w-8 h-8 text-slate-300" />
+              <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-full">
+                <Code className="w-8 h-8 text-slate-300 dark:text-slate-600" />
               </div>
-              <p className="text-slate-500 font-medium text-base md:text-lg text-center px-4">How can I help you with your code?</p>
+              <p className="text-slate-500 dark:text-slate-400 font-medium text-base md:text-lg text-center px-4">How can I help you with your code?</p>
               {!repoId && <p className="text-sm text-center px-4">← Please select or add a repository first</p>}
             </div>
           ) : (
@@ -599,7 +617,7 @@ function App() {
                     <div className={`px-4 py-3 md:px-5 md:py-3.5 rounded-2xl text-[14px] md:text-[15px] leading-relaxed shadow-sm ${
                       msg.role === 'user'
                         ? 'bg-blue-600 text-white rounded-br-sm'
-                        : 'bg-white border border-slate-200 text-slate-800 rounded-bl-sm'
+                        : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-bl-sm'
                     }`}>
                       <div className="whitespace-pre-wrap">{msg.content}</div>
                     </div>
@@ -607,7 +625,7 @@ function App() {
                     {/* Context Accordion */}
                     {msg.role === 'assistant' && msg.context && msg.context.length > 0 && (
                       <details className="w-full mt-2 group">
-                        <summary className="text-xs text-slate-500 cursor-pointer hover:text-slate-700 select-none flex items-center gap-1 transition-colors bg-slate-50 w-fit px-3 py-1.5 rounded-full border border-slate-200">
+                        <summary className="text-xs text-slate-500 dark:text-slate-400 cursor-pointer hover:text-slate-700 dark:hover:text-slate-200 select-none flex items-center gap-1 transition-colors bg-slate-50 dark:bg-slate-800 w-fit px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-700">
                           <ChevronRight className="w-3 h-3 group-open:rotate-90 transition-transform" />
                           View {msg.context.length} source snippet{msg.context.length !== 1 ? 's' : ''}
                         </summary>
@@ -632,12 +650,12 @@ function App() {
               
               {isLoading && (
                 <div className="flex gap-3 md:gap-4 items-start">
-                  <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-1">
-                    <Code className="w-4 h-4 text-blue-600" />
+                  <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center flex-shrink-0 mt-1">
+                    <Code className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                   </div>
-                  <div className="bg-white border border-slate-200 rounded-2xl rounded-bl-sm px-4 py-3 md:px-5 md:py-3.5 flex items-center gap-3 shadow-sm">
+                  <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl rounded-bl-sm px-4 py-3 md:px-5 md:py-3.5 flex items-center gap-3 shadow-sm">
                     <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-                    <span className="text-[14px] md:text-[15px] text-slate-500">Searching codebase...</span>
+                    <span className="text-[14px] md:text-[15px] text-slate-500 dark:text-slate-400">Searching codebase...</span>
                   </div>
                 </div>
               )}
@@ -647,9 +665,9 @@ function App() {
         </div>
 
         {/* Input Area */}
-        <div className="p-3 md:p-6 bg-white/80 backdrop-blur-sm border-t border-slate-100 flex-shrink-0">
+        <div className="p-3 md:p-6 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-t border-slate-100 dark:border-slate-700 flex-shrink-0">
           <div className="max-w-4xl mx-auto relative">
-            <form onSubmit={handleAskQuestion} className="relative flex items-end shadow-sm border border-slate-300 bg-white rounded-2xl overflow-hidden focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent transition-all">
+            <form onSubmit={handleAskQuestion} className="relative flex items-end shadow-sm border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 rounded-2xl overflow-hidden focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent transition-all">
               <textarea
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
@@ -660,7 +678,7 @@ function App() {
                   }
                 }}
                 placeholder={repoId ? "Ask a question about your code..." : "Select a repository to ask questions"}
-                className="w-full max-h-48 min-h-[52px] md:min-h-[56px] py-3.5 md:py-4 pl-4 md:pl-5 pr-14 text-slate-900 bg-transparent resize-none outline-none text-[14px] md:text-[15px]"
+                className="w-full max-h-48 min-h-[52px] md:min-h-[56px] py-3.5 md:py-4 pl-4 md:pl-5 pr-14 text-slate-900 dark:text-slate-100 bg-transparent placeholder:text-slate-400 dark:placeholder:text-slate-500 resize-none outline-none text-[14px] md:text-[15px]"
                 disabled={isLoading || !repoId}
                 rows={1}
               />
@@ -685,11 +703,11 @@ function App() {
       {/* UPLOAD MODAL */}
       {isUploadModalOpen && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden relative max-h-[90vh] overflow-y-auto">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-lg overflow-hidden relative max-h-[90vh] overflow-y-auto">
             
             {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 sticky top-0">
-              <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50/50 dark:bg-slate-700/50 sticky top-0">
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                 <Upload className="w-5 h-5 text-blue-600" />
                 Add Repository
               </h2>
@@ -708,14 +726,14 @@ function App() {
             {/* Modal Body */}
             <div className="p-6">
               {/* ZIP Upload */}
-              <div className="border-2 border-dashed border-slate-200 hover:border-blue-400 rounded-xl p-8 text-center bg-slate-50 transition-colors cursor-pointer relative group mb-4">
+              <div className="border-2 border-dashed border-slate-200 dark:border-slate-600 hover:border-blue-400 rounded-xl p-8 text-center bg-slate-50 dark:bg-slate-700/50 transition-colors cursor-pointer relative group mb-4">
                 <input
                   type="file"
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                   accept=".zip"
                   onChange={handleFileChange}
                 />
-                <div className="flex flex-col items-center gap-3 text-slate-500 group-hover:text-blue-600 transition-colors">
+                <div className="flex flex-col items-center gap-3 text-slate-500 dark:text-slate-400 group-hover:text-blue-600 transition-colors">
                   <Upload className="w-8 h-8" />
                   <p className="font-medium text-sm">{repoFile ? repoFile.name : "Click or drag ZIP file here"}</p>
                 </div>
@@ -730,9 +748,9 @@ function App() {
               </button>
 
               <div className="relative flex items-center py-2 mb-6">
-                <div className="flex-grow border-t border-slate-200"></div>
-                <span className="flex-shrink-0 mx-4 text-slate-400 text-xs font-semibold tracking-wider uppercase">OR</span>
-                <div className="flex-grow border-t border-slate-200"></div>
+                <div className="flex-grow border-t border-slate-200 dark:border-slate-600"></div>
+                <span className="flex-shrink-0 mx-4 text-slate-400 dark:text-slate-500 text-xs font-semibold tracking-wider uppercase">OR</span>
+                <div className="flex-grow border-t border-slate-200 dark:border-slate-600"></div>
               </div>
 
               {/* GitHub Upload */}
@@ -744,7 +762,7 @@ function App() {
                     value={githubUrl}
                     onChange={(e) => setGithubUrl(e.target.value)}
                     placeholder="https://github.com/user/repo"
-                    className="w-full bg-white border border-slate-200 rounded-xl py-2.5 pl-10 pr-4 text-slate-900 focus:ring-2 focus:ring-slate-800 focus:border-transparent transition-all text-sm outline-none shadow-sm"
+                    className="w-full bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl py-2.5 pl-10 pr-4 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-slate-800 focus:border-transparent transition-all text-sm outline-none shadow-sm"
                   />
                 </div>
                 <button
@@ -765,7 +783,7 @@ function App() {
               )}
 
               {uploadStatus && (
-                <div className="mt-4 p-3 bg-blue-50 text-blue-700 text-sm rounded-lg flex items-center gap-2">
+                <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-sm rounded-lg flex items-center gap-2">
                   {uploadProgress > 0 && uploadProgress < 100 && <Loader2 className="w-4 h-4 animate-spin" />}
                   {uploadStatus}
                 </div>

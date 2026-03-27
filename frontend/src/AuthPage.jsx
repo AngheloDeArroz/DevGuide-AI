@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { useAuth } from './AuthProvider'
-import { Code, LogIn, UserPlus, Loader2, Mail, Lock, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react'
+import { useTheme } from './ThemeContext'
+import { Code, LogIn, UserPlus, Loader2, Mail, Lock, Eye, EyeOff, AlertCircle, CheckCircle, Sun, Moon } from 'lucide-react'
 
 export default function AuthPage() {
   const { signIn, signUp } = useAuth()
+  const { theme, toggleTheme } = useTheme()
   const [isSignUp, setIsSignUp] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -69,7 +71,24 @@ export default function AuthPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 flex items-center justify-center p-4">
+    <div className={`min-h-screen flex items-center justify-center p-4 relative transition-colors duration-300 ${
+      theme === 'dark'
+        ? 'bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900'
+        : 'bg-gradient-to-br from-blue-50 via-slate-100 to-blue-100'
+    }`}>
+      {/* Theme toggle — top right corner */}
+      <button
+        onClick={toggleTheme}
+        className={`absolute top-4 right-4 p-2 rounded-xl transition-all ${
+          theme === 'dark'
+            ? 'bg-white/10 hover:bg-white/20 text-white/70 hover:text-white'
+            : 'bg-slate-900/10 hover:bg-slate-900/20 text-slate-600 hover:text-slate-900'
+        }`}
+        title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+      >
+        {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+      </button>
+
       {/* Background decorative elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse"></div>
@@ -82,20 +101,24 @@ export default function AuthPage() {
           <div className="inline-flex items-center justify-center bg-blue-600 p-3 rounded-2xl mb-4 shadow-lg shadow-blue-500/25">
             <Code className="text-white w-8 h-8" />
           </div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">DevGuide AI</h1>
-          <p className="text-slate-400 mt-2">AI-powered codebase exploration</p>
+          <h1 className={`text-3xl font-bold tracking-tight ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>DevGuide AI</h1>
+          <p className={`mt-2 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>AI-powered codebase exploration</p>
         </div>
 
         {/* Auth Card */}
-        <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-8 shadow-2xl">
+        <div className={`backdrop-blur-xl border rounded-2xl p-8 shadow-2xl ${
+          theme === 'dark'
+            ? 'bg-white/10 border-white/20'
+            : 'bg-white/80 border-slate-200'
+        }`}>
           {/* Tab Toggle */}
-          <div className="flex bg-white/5 rounded-xl p-1 mb-6">
+          <div className={`flex rounded-xl p-1 mb-6 ${theme === 'dark' ? 'bg-white/5' : 'bg-slate-100'}`}>
             <button
               onClick={() => { if (isSignUp) toggleMode() }}
               className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 ${
                 !isSignUp
                   ? 'bg-blue-600 text-white shadow-md'
-                  : 'text-slate-300 hover:text-white'
+                  : theme === 'dark' ? 'text-slate-300 hover:text-white' : 'text-slate-500 hover:text-slate-800'
               }`}
             >
               <LogIn className="w-4 h-4" />
@@ -106,7 +129,7 @@ export default function AuthPage() {
               className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 ${
                 isSignUp
                   ? 'bg-blue-600 text-white shadow-md'
-                  : 'text-slate-300 hover:text-white'
+                  : theme === 'dark' ? 'text-slate-300 hover:text-white' : 'text-slate-500 hover:text-slate-800'
               }`}
             >
               <UserPlus className="w-4 h-4" />
@@ -124,7 +147,11 @@ export default function AuthPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Email address"
-                className="w-full bg-white/10 border border-white/10 rounded-xl py-3 pl-11 pr-4 text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white/15 transition-all outline-none"
+                className={`w-full border rounded-xl py-3 pl-11 pr-4 placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none ${
+                  theme === 'dark'
+                    ? 'bg-white/10 border-white/10 text-white focus:bg-white/15'
+                    : 'bg-white border-slate-200 text-slate-900 focus:bg-white'
+                }`}
                 autoComplete="email"
               />
             </div>
@@ -138,13 +165,19 @@ export default function AuthPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Password"
-                className="w-full bg-white/10 border border-white/10 rounded-xl py-3 pl-11 pr-11 text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white/15 transition-all outline-none"
+                className={`w-full border rounded-xl py-3 pl-11 pr-11 placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none ${
+                  theme === 'dark'
+                    ? 'bg-white/10 border-white/10 text-white focus:bg-white/15'
+                    : 'bg-white border-slate-200 text-slate-900 focus:bg-white'
+                }`}
                 autoComplete={isSignUp ? 'new-password' : 'current-password'}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
+                className={`absolute right-3 top-1/2 -translate-y-1/2 transition-colors ${
+                  theme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-400 hover:text-slate-700'
+                }`}
               >
                 {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
               </button>
@@ -160,7 +193,11 @@ export default function AuthPage() {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="Confirm password"
-                  className="w-full bg-white/10 border border-white/10 rounded-xl py-3 pl-11 pr-4 text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white/15 transition-all outline-none"
+                  className={`w-full border rounded-xl py-3 pl-11 pr-4 placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none ${
+                    theme === 'dark'
+                      ? 'bg-white/10 border-white/10 text-white focus:bg-white/15'
+                      : 'bg-white border-slate-200 text-slate-900 focus:bg-white'
+                  }`}
                   autoComplete="new-password"
                 />
               </div>
@@ -168,7 +205,7 @@ export default function AuthPage() {
 
             {/* Error Message */}
             {error && (
-              <div className="flex items-start gap-2 bg-red-500/15 border border-red-500/30 text-red-300 px-4 py-3 rounded-xl text-sm">
+              <div className="flex items-start gap-2 bg-red-500/15 border border-red-500/30 text-red-400 px-4 py-3 rounded-xl text-sm">
                 <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
                 <span>{error}</span>
               </div>
@@ -176,7 +213,7 @@ export default function AuthPage() {
 
             {/* Success Message */}
             {success && (
-              <div className="flex items-start gap-2 bg-green-500/15 border border-green-500/30 text-green-300 px-4 py-3 rounded-xl text-sm">
+              <div className="flex items-start gap-2 bg-green-500/15 border border-green-500/30 text-green-500 px-4 py-3 rounded-xl text-sm">
                 <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
                 <span>{success}</span>
               </div>
@@ -202,11 +239,6 @@ export default function AuthPage() {
             </button>
           </form>
         </div>
-
-        {/* Footer text */}
-        <p className="text-center text-slate-500 text-xs mt-6">
-          Powered by Supabase Authentication
-        </p>
       </div>
     </div>
   )
