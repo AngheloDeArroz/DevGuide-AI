@@ -1,6 +1,6 @@
 # DevGuide AI
 
-DevGuide AI is an AI-powered code analysis tool that allows users to upload GitHub repository ZIP files, parses their contents, and enables conversational Q&A to help understand the codebase using RAG (Retrieval-Augmented Generation). 
+DevGuide AI is an AI-powered code analysis tool that allows users to upload GitHub repository via link or ZIP files, parses their contents, and enables conversational Q&A to help understand the codebase using RAG (Retrieval-Augmented Generation). 
 
 ## Features
 - **Upload & parse:** Upload any ZIP file containing a codebase.
@@ -31,7 +31,35 @@ Before you begin, ensure you have the following installed:
 
 ---
 
-## How to Run
+## 🐳 Running with Docker (Recommended)
+
+The easiest way to run the project. No Python or Node.js installation required — just [Docker](https://www.docker.com/products/docker-desktop/).
+
+**1. Set up environment variables:**
+```bash
+# Backend — Supabase DB connection + Gemini API key
+cp backend/.env.example backend/.env
+
+# Frontend — Supabase project URL and anon key
+cp frontend/.env.example frontend/.env
+```
+Edit both `.env` files and fill in your credentials.
+
+**2. Build and start all services:**
+```bash
+docker compose up --build
+```
+
+**3. Open the app:**  
+Navigate to **http://localhost:5173** in your browser.
+
+To stop: `docker compose down`
+
+> **Note:** Uploaded repositories are stored in a Docker volume (`backend_uploads`) and persist across restarts.
+
+---
+
+## How to Run (Manual Setup)
 
 To run the application locally, you will need to start both the backend server and the frontend development server in two separate terminal windows.
 
