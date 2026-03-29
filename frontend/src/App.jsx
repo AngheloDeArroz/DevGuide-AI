@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import axios from 'axios'
 import { useAuth } from './AuthProvider'
-import AuthPage from './AuthPage'
+import LandingPage from './LandingPage'
 import { useTheme } from './ThemeContext'
 import './App.css'
 
@@ -28,6 +28,9 @@ function App() {
   const [repoName, setRepoName] = useState(localStorage.getItem('repoName') || '')
   const [uploadStatus, setUploadStatus] = useState('')
   const [uploadProgress, setUploadProgress] = useState(0)
+  const [zipSizeError, setZipSizeError] = useState('')
+
+  const MAX_ZIP_SIZE_MB = 50
   const [repos, setRepos] = useState([])
 
   // Conversation state
@@ -248,8 +251,22 @@ function App() {
 
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files.length > 0) {
-      setRepoFile(e.target.files[0])
-      setUploadStatus(`Selected: ${e.target.files[0].name}`)
+      const file = e.target.files[0]
+      const fileSizeMB = file.size / (1024 * 1024)
+
+      if (fileSizeMB > MAX_ZIP_SIZE_MB) {
+        setRepoFile(null)
+        setZipSizeError(
+          `This file is ${fileSizeMB.toFixed(1)} MB, which exceeds the ${MAX_ZIP_SIZE_MB} MB limit. Please use a GitHub repository link instead.`
+        )
+        setUploadStatus('')
+        e.target.value = ''
+        return
+      }
+
+      setZipSizeError('')
+      setRepoFile(file)
+      setUploadStatus(`Selected: ${file.name} (${fileSizeMB.toFixed(1)} MB)`)
       setUploadProgress(0)
     }
   }
@@ -279,7 +296,14 @@ function App() {
       setRepoFile(null)
       setIsUploadModalOpen(false)
     } catch (error) {
-      setUploadStatus(`Error: ${error.response?.data?.detail || error.message}`)
+      const detail = error.response?.data?.detail || error.message
+      if (error.response?.status === 413) {
+        setZipSizeError(detail)
+        setUploadStatus('')
+        setRepoFile(null)
+      } else {
+        setUploadStatus(`Error: ${detail}`)
+      }
       setUploadProgress(0)
     }
   }
@@ -327,7 +351,7 @@ function App() {
     )
   }
 
-  if (!session) return <AuthPage />
+  if (!session) return <LandingPage />
 
   return (
     <div className="flex h-screen bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 font-sans overflow-hidden">
@@ -716,6 +740,7 @@ function App() {
                   setIsUploadModalOpen(false)
                   setUploadStatus('')
                   setUploadProgress(0)
+                  setZipSizeError('')
                 }}
                 className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
               >
@@ -726,7 +751,11 @@ function App() {
             {/* Modal Body */}
             <div className="p-6">
               {/* ZIP Upload */}
-              <div className="border-2 border-dashed border-slate-200 dark:border-slate-600 hover:border-blue-400 rounded-xl p-8 text-center bg-slate-50 dark:bg-slate-700/50 transition-colors cursor-pointer relative group mb-4">
+              <div className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors cursor-pointer relative group mb-4 ${
+                zipSizeError
+                  ? 'border-amber-400 bg-amber-50 dark:bg-amber-900/20'
+                  : 'border-slate-200 dark:border-slate-600 hover:border-blue-400 bg-slate-50 dark:bg-slate-700/50'
+              }`}>
                 <input
                   type="file"
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
@@ -736,12 +765,24 @@ function App() {
                 <div className="flex flex-col items-center gap-3 text-slate-500 dark:text-slate-400 group-hover:text-blue-600 transition-colors">
                   <Upload className="w-8 h-8" />
                   <p className="font-medium text-sm">{repoFile ? repoFile.name : "Click or drag ZIP file here"}</p>
+                  <p className="text-xs text-slate-400 dark:text-slate-500">Maximum file size: {MAX_ZIP_SIZE_MB} MB</p>
                 </div>
               </div>
 
+              {/* ZIP size error banner */}
+              {zipSizeError && (
+                <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded-xl flex flex-col gap-2">
+                  <div className="flex items-start gap-2">
+                    <span className="text-amber-500 text-lg leading-none mt-0.5">⚠️</span>
+                    <p className="text-sm text-amber-800 dark:text-amber-200">{zipSizeError}</p>
+                  </div>
+                  <p className="text-xs text-amber-600 dark:text-amber-300 ml-7">Paste your GitHub URL below to import larger repositories.</p>
+                </div>
+              )}
+
               <button
                 onClick={handleUpload}
-                disabled={!repoFile || uploadProgress > 0}
+                disabled={!repoFile || uploadProgress > 0 || !!zipSizeError}
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-xl transition-all shadow-sm disabled:opacity-50 text-sm mb-6"
               >
                 Upload & Index ZIP

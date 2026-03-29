@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { useAuth } from './AuthProvider'
 import { useTheme } from './ThemeContext'
-import { Code, LogIn, UserPlus, Loader2, Mail, Lock, Eye, EyeOff, AlertCircle, CheckCircle, Sun, Moon } from 'lucide-react'
+import { Code, LogIn, UserPlus, Loader2, Mail, Lock, Eye, EyeOff, AlertCircle, CheckCircle, Sun, Moon, ArrowLeft } from 'lucide-react'
 
-export default function AuthPage() {
+export default function AuthPage({ onBack }) {
   const { signIn, signUp } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const [isSignUp, setIsSignUp] = useState(false)
@@ -53,7 +53,6 @@ export default function AuthPage() {
         if (error) {
           setError(error.message)
         }
-        // On success, AuthProvider will update session and App.jsx will render the dashboard
       }
     } catch (err) {
       setError('An unexpected error occurred. Please try again.')
@@ -76,26 +75,44 @@ export default function AuthPage() {
         ? 'bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900'
         : 'bg-gradient-to-br from-blue-50 via-slate-100 to-blue-100'
     }`}>
-      {/* Theme toggle — top right corner */}
-      <button
-        onClick={toggleTheme}
-        className={`absolute top-4 right-4 p-2 rounded-xl transition-all ${
-          theme === 'dark'
-            ? 'bg-white/10 hover:bg-white/20 text-white/70 hover:text-white'
-            : 'bg-slate-900/10 hover:bg-slate-900/20 text-slate-600 hover:text-slate-900'
-        }`}
-        title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-      >
-        {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-      </button>
-
+      
       {/* Background decorative elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse"></div>
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
       </div>
 
-      <div className="relative w-full max-w-md">
+      <div className="relative w-full max-w-md z-10">
+        
+        {/* Modern Utility Bar: Back Button & Theme Toggle anchored to the card */}
+        <div className="flex items-center justify-between mb-6">
+          {onBack ? (
+            <button
+              onClick={onBack}
+              className={`group flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200 ${
+                theme === 'dark'
+                  ? 'text-slate-400 hover:text-white hover:bg-white/10'
+                  : 'text-slate-500 hover:text-slate-900 hover:bg-slate-900/10'
+              }`}
+            >
+              <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
+              Back
+            </button>
+          ) : <div />} {/* Empty div keeps the theme toggle on the right if onBack is null */}
+
+          <button
+            onClick={toggleTheme}
+            className={`p-2 rounded-full transition-all duration-200 ${
+              theme === 'dark'
+                ? 'text-slate-400 hover:text-white hover:bg-white/10'
+                : 'text-slate-500 hover:text-slate-900 hover:bg-slate-900/10'
+            }`}
+            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+          </button>
+        </div>
+
         {/* Logo + Title */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center bg-blue-600 p-3 rounded-2xl mb-4 shadow-lg shadow-blue-500/25">
