@@ -17,3 +17,5 @@ python-dotenv
 httpx
 pydantic
 PyJWT
+cryptography
+psutil
