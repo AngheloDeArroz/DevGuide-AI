@@ -30,7 +30,7 @@ from pathlib import Path
 from database import get_db, engine
 from parser import extract_repository, parse_and_chunk
 from embeddings import generate_embeddings
-from retrieval import store_chunks, semantic_search
+from retrieval import store_chunks, semantic_search, get_file_tree
 from llm import generate_explanation
 from auth import get_current_user
 from cost_monitor import monitor
@@ -446,14 +446,13 @@ async def ask_question(
         logger.info(f"[ask] Found {len(relevant_chunks)} relevant chunks")
 
         if not relevant_chunks:
-            return {
-                "answer": "No relevant code found in this repository for your question.",
-                "context": [],
-            }
+            logger.info("[ask] No relevant chunks found. Still calling LLM for general knowledge.")
+            relevant_chunks = []
 
         logger.info("[ask] Sending to Gemini LLM...")
+        file_tree_paths = get_file_tree(db, request.repo_id)
         async with _llm_semaphore:
-            answer = generate_explanation(request.question, relevant_chunks)
+            answer = generate_explanation(request.question, relevant_chunks, file_tree_paths)
         logger.info(f"[ask] Got LLM response ({len(answer)} chars)")
 
         return {"answer": answer, "context": relevant_chunks}
@@ -595,12 +594,13 @@ async def ask_in_conversation(
         relevant_chunks = semantic_search(db, request.question, repo_id)
 
         if not relevant_chunks:
-            answer = "No relevant code found in this repository for your question."
+            logger.info("[conv-ask] No relevant chunks found. Still calling LLM for general knowledge.")
             relevant_chunks = []
-        else:
-            # 2. LLM (with concurrency control)
-            async with _llm_semaphore:
-                answer = generate_explanation(request.question, relevant_chunks)
+
+        # 2. LLM (with concurrency control)
+        file_tree_paths = get_file_tree(db, repo_id)
+        async with _llm_semaphore:
+            answer = generate_explanation(request.question, relevant_chunks, file_tree_paths)
 
         # 3. Save user message
         db.execute(

@@ -34,7 +34,7 @@ def _approx_tokens(text: str) -> int:
     return len(text) // 4
 
 
-def generate_explanation(question: str, context_chunks: list[dict]) -> str:
+def generate_explanation(question: str, context_chunks: list[dict], file_tree_paths: list[str] = None) -> str:
     """Generate an LLM answer for a user question given retrieved code context."""
     # Build a deterministic cache key from question + context
     context_str = "|".join(c.get("content", "") for c in context_chunks)
@@ -51,34 +51,42 @@ def generate_explanation(question: str, context_chunks: list[dict]) -> str:
     # ── Build RAG prompt ──────────────────────────────────────────────
     system = (
         "You are DevGuide AI, an expert software engineer assistant. "
-        "You help developers understand codebases by answering questions "
-        "using only the code snippets provided below. "
-        "Be precise, reference specific file paths and function names, "
-        "and keep your answers concise."
+        "You help developers understand codebases by answering questions. "
+        "If specific code snippets are provided, use them to answer precisely, referencing file paths. "
+        "If no code snippets are provided, rely on your extensive general knowledge about software architecture, deployment, and best practices to provide a helpful answer."
     )
 
     # Code context block
     context_block = []
-    for i, chunk in enumerate(context_chunks):
-        context_block.append(
-            f"### File: `{chunk['file_path']}` (snippet {i + 1})\n"
-            f"```\n{chunk['content']}\n```"
-        )
-    code_context = "\n\n".join(context_block)
+    if context_chunks:
+        for i, chunk in enumerate(context_chunks):
+            context_block.append(
+                f"### File: `{chunk['file_path']}` (snippet {i + 1})\n"
+                f"```\n{chunk['content']}\n```"
+            )
+        code_context = "\n\n".join(context_block)
+    else:
+        code_context = "No specific code snippets found for this query."
+
+    if file_tree_paths:
+        tree_str = "\n".join(file_tree_paths)
+        file_tree_context = f"**Repository File Tree:**\n```\n{tree_str}\n```\n\n"
+    else:
+        file_tree_context = ""
 
     prompt = (
         f"{system}\n\n"
         f"---\n\n"
         f"**User Question:** {question}\n\n"
         f"---\n\n"
-        f"**Relevant Code:**\n\n{code_context}\n\n"
+        f"{file_tree_context}"
+        f"**Relevant Code Snippets:**\n\n{code_context}\n\n"
         f"---\n\n"
         f"**Guidelines:**\n"
         f"- Answer the question directly and concisely.\n"
-        f"- Reference file paths and function/class names using inline code (`backticks`).\n"
+        f"- If code snippets are provided, reference file paths and function/class names using inline code (`backticks`).\n"
         f"- Use markdown code blocks with the correct language tag when showing code.\n"
-        f"- If the provided code does not contain enough information to answer, say so clearly.\n"
-        f"- Do not fabricate code that is not in the snippets above."
+        f"- If no code snippets are provided or they don't contain enough information, answer the question generally using the Repository File Tree to deduce architecture and context."
     )
 
 

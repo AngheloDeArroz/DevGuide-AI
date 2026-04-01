@@ -119,3 +119,20 @@ def semantic_search(
     # Cache the result
     search_cache.set(cache_key, retrieved_chunks)
     return retrieved_chunks
+
+
+def get_file_tree(
+    db: Session,
+    repo_id: str,
+    limit: int = 500
+) -> list[str]:
+    """Retrieve up to 'limit' distinct file paths from the repository to provide high-level context."""
+    sql = text("""
+        SELECT DISTINCT file_path
+        FROM code_snippets
+        WHERE repository_id = :repo_id
+        ORDER BY file_path
+        LIMIT :limit
+    """)
+    results = db.execute(sql, {"repo_id": repo_id, "limit": limit}).fetchall()
+    return [row.file_path for row in results]
