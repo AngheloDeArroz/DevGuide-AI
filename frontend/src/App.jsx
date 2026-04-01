@@ -6,6 +6,7 @@ import {
   Menu, Sun, Moon
 } from 'lucide-react'
 import axios from 'axios'
+import ReactMarkdown from 'react-markdown'
 import { useAuth } from './AuthProvider'
 import LandingPage from './LandingPage'
 import { useTheme } from './ThemeContext'
@@ -20,6 +21,7 @@ function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [isRepoDropdownOpen, setIsRepoDropdownOpen] = useState(false)
   const repoDropdownRef = useRef(null)
+  const prevRepoIdRef = useRef(null)
 
   // Repo state
   const [repoFile, setRepoFile] = useState(null)
@@ -70,14 +72,22 @@ function App() {
   // Fetch conversations when repo changes — only when session is ready
   useEffect(() => {
     if (!session) return
+    const isRepoChange = repoId !== prevRepoIdRef.current;
+    
     if (repoId) {
       fetchConversations(repoId)
-      setActiveConvId(null)
-      setMessages([])
+      if (isRepoChange) {
+        setActiveConvId(null)
+        setMessages([])
+        prevRepoIdRef.current = repoId
+      }
     } else {
       setConversations([])
-      setActiveConvId(null)
-      setMessages([])
+      if (isRepoChange) {
+        setActiveConvId(null)
+        setMessages([])
+        prevRepoIdRef.current = repoId
+      }
     }
   }, [repoId, session])
 
@@ -375,27 +385,35 @@ function App() {
       `}>
 
         {/* Logo & App Name + Collapse Button */}
-        <div className="p-4 flex items-center border-b border-slate-200 dark:border-slate-700" style={{ minWidth: isSidebarOpen ? '18rem' : '4rem' }}>
-          {/* Logo icon — always visible */}
-          <div className="bg-blue-600 p-2 rounded-lg flex-shrink-0">
-            <Code className="text-white w-5 h-5" />
+        <div className={`p-4 flex items-center border-b border-slate-200 dark:border-slate-700 ${!isSidebarOpen ? 'justify-center' : ''}`} style={{ minWidth: isSidebarOpen ? '18rem' : '4rem' }}>
+          
+          {/* Logo & Title - fades out when collapsed on desktop */}
+          <div className={`flex items-center overflow-hidden transition-all duration-200 ${isSidebarOpen ? 'opacity-100' : 'w-0 opacity-0 pointer-events-none md:pointer-events-auto hidden md:flex'}`}>
+             <div className="bg-blue-600 p-2 rounded-lg flex-shrink-0">
+               <Code className="text-white w-5 h-5" />
+             </div>
+             <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 tracking-tight whitespace-nowrap ml-3">
+               DevGuide AI
+             </h1>
           </div>
-          {/* Title — only when expanded */}
-          <h1 className={`text-xl font-bold text-slate-900 dark:text-slate-100 tracking-tight whitespace-nowrap ml-3 transition-all duration-200 overflow-hidden ${isSidebarOpen ? 'opacity-100 max-w-xs' : 'opacity-0 max-w-0 ml-0'}`}>
-            DevGuide AI
-          </h1>
-          {/* Collapse button — only on desktop when expanded */}
-          {isSidebarOpen && (
-            <div className="ml-auto flex items-center gap-0.5 flex-shrink-0">
-              <button
-                onClick={() => setIsSidebarOpen(false)}
-                className="p-1.5 rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors hidden md:flex"
-                title="Collapse sidebar"
-              >
-                <PanelLeftClose className="w-4 h-4" />
-              </button>
-            </div>
-          )}
+
+          <div className={`${isSidebarOpen ? 'ml-auto' : ''} flex items-center flex-shrink-0`}>
+            {/* Desktop open/collapse toggle */}
+            <button
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="p-1.5 rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors hidden md:flex"
+              title={isSidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+            >
+              {isSidebarOpen ? <PanelLeftClose className="w-5 h-5" /> : <PanelLeftOpen className="w-5 h-5" />}
+            </button>
+            
+            {/* Logo placeholder for Mobile when sidebar is partially hidden/transitioning */}
+            {!isSidebarOpen && (
+               <div className="md:hidden bg-blue-600 p-2 rounded-lg flex-shrink-0">
+                 <Code className="text-white w-5 h-5" />
+               </div>
+            )}
+          </div>
         </div>
 
         {/* Content only visible when open */}
@@ -563,7 +581,7 @@ function App() {
       {/* MAIN CHAT AREA */}
       <main className="flex-1 flex flex-col h-full relative bg-white dark:bg-slate-900 min-w-0">
         {/* Chat Header */}
-        <header className="h-14 md:h-16 border-b border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-900 flex items-center px-3 md:px-6 justify-between flex-shrink-0 gap-2">
+        <header className="relative h-14 md:h-16 border-b border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-900 flex items-center px-3 md:px-6 justify-between flex-shrink-0 gap-2">
           <div className="flex items-center gap-2 md:gap-3 min-w-0">
             {/* Mobile hamburger */}
             <button
@@ -572,27 +590,20 @@ function App() {
             >
               <Menu className="w-5 h-5" />
             </button>
-            {/* Desktop collapse toggle (when collapsed) */}
-            {!isSidebarOpen && (
-              <button
-                onClick={() => setIsSidebarOpen(true)}
-                className="hidden md:flex p-1.5 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors flex-shrink-0"
-                title="Expand sidebar"
-              >
-                <PanelLeftOpen className="w-4 h-4" />
-              </button>
-            )}
-            <h2 className="text-base md:text-lg font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2 min-w-0">
-              {repoName ? (
-                <>
-                  <Code className="w-4 h-4 md:w-5 md:h-5 text-indigo-500 flex-shrink-0" />
-                  <span className="truncate">{repoName}</span>
-                </>
-              ) : (
-                <span className="text-slate-400 font-normal text-sm md:text-base">Select a repository to begin</span>
-              )}
-            </h2>
+            {/* Desktop collapse toggle removed from header (moved to side nav) */}
           </div>
+          
+          <h2 className="absolute left-1/2 -translate-x-1/2 text-base md:text-lg font-semibold text-slate-800 dark:text-slate-100 flex items-center justify-center gap-2 min-w-0 max-w-[50%] pointer-events-none">
+            {!isSidebarOpen && repoName ? (
+              <>
+                <span className="text-slate-400 dark:text-slate-500 font-normal text-sm hidden sm:inline mr-1">Repository:</span>
+                <Database className="w-4 h-4 md:w-5 md:h-5 text-blue-500 flex-shrink-0" />
+                <span className="truncate">{repoName}</span>
+              </>
+            ) : !repoName ? (
+              <span className="text-slate-400 font-normal text-sm md:text-base truncate">Select a repository to begin</span>
+            ) : null}
+          </h2>
           
           {/* Header right actions */}
           <div className="flex items-center gap-1 flex-shrink-0">
@@ -626,9 +637,9 @@ function App() {
               {!repoId && <p className="text-sm text-center px-4">← Please select or add a repository first</p>}
             </div>
           ) : (
-            <div className="max-w-4xl mx-auto w-full flex flex-col gap-6">
+            <div className="max-w-7xl mx-auto w-full flex flex-col gap-6">
               {messages.map((msg, idx) => (
-                <div key={msg.id || idx} className={`flex gap-3 md:gap-4 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div key={msg.id || idx} className={`flex gap-3 md:gap-4 ${msg.role === 'user' ? 'justify-end' : 'justify-start w-full'}`}>
                   
                   {/* Avatar for Assistant */}
                   {msg.role === 'assistant' && (
@@ -637,13 +648,44 @@ function App() {
                     </div>
                   )}
 
-                  <div className={`flex flex-col gap-1 ${msg.role === 'user' ? 'max-w-[85%] md:max-w-[75%] items-end' : 'max-w-[90%] md:max-w-[85%] items-start'}`}>
-                    <div className={`px-4 py-3 md:px-5 md:py-3.5 rounded-2xl text-[14px] md:text-[15px] leading-relaxed shadow-sm ${
+                  <div className={`flex flex-col gap-1 ${msg.role === 'user' ? 'max-w-[85%] md:max-w-[75%] items-end' : 'flex-1 min-w-0 items-start'}`}>
+                    <div className={`text-[14px] md:text-[15px] leading-relaxed ${
                       msg.role === 'user'
-                        ? 'bg-blue-600 text-white rounded-br-sm'
-                        : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-bl-sm'
+                        ? 'px-4 py-3 md:px-5 md:py-3.5 rounded-2xl bg-blue-600 text-white rounded-br-sm shadow-sm'
+                        : 'py-1.5 w-full bg-transparent text-slate-800 dark:text-slate-100'
                     }`}>
-                      <div className="whitespace-pre-wrap">{msg.content}</div>
+                      <div className={`break-words ${msg.role === 'user' ? 'whitespace-pre-wrap' : ''}`}>
+                        {msg.role === 'assistant' ? (
+                          <ReactMarkdown 
+                            components={{
+                              pre({node, ...props}) {
+                                return <pre className="bg-slate-100 dark:bg-slate-900 overflow-x-auto p-3 rounded-lg text-sm mt-2 mb-2" {...props} />
+                              },
+                              code({node, inline, ...props}) {
+                                return inline 
+                                  ? <code className="bg-slate-100 dark:bg-slate-900 px-1 py-0.5 rounded text-[0.9em]" {...props} />
+                                  : <code {...props} />
+                              },
+                              p({node, ...props}) {
+                                return <p className="mb-2 last:mb-0" {...props} />
+                              },
+                              ul({node, ...props}) {
+                                return <ul className="list-disc pl-5 mb-2" {...props} />
+                              },
+                              ol({node, ...props}) {
+                                return <ol className="list-decimal pl-5 mb-2" {...props} />
+                              },
+                              li({node, ...props}) {
+                                return <li className="mb-1" {...props} />
+                              }
+                            }}
+                          >
+                            {msg.content}
+                          </ReactMarkdown>
+                        ) : (
+                          msg.content
+                        )}
+                      </div>
                     </div>
 
                     {/* Context Accordion */}
@@ -673,13 +715,13 @@ function App() {
               ))}
               
               {isLoading && (
-                <div className="flex gap-3 md:gap-4 items-start">
+                <div className="flex gap-3 md:gap-4 items-start w-full">
                   <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center flex-shrink-0 mt-1">
                     <Code className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                   </div>
-                  <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl rounded-bl-sm px-4 py-3 md:px-5 md:py-3.5 flex items-center gap-3 shadow-sm">
+                  <div className="py-2.5 flex items-center gap-3">
                     <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-                    <span className="text-[14px] md:text-[15px] text-slate-500 dark:text-slate-400">Searching codebase...</span>
+                    <span className="text-[14px] md:text-[15px] text-slate-500 dark:text-slate-400 font-medium tracking-wide">Searching codebase...</span>
                   </div>
                 </div>
               )}
@@ -690,7 +732,7 @@ function App() {
 
         {/* Input Area */}
         <div className="p-3 md:p-6 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-t border-slate-100 dark:border-slate-700 flex-shrink-0">
-          <div className="max-w-4xl mx-auto relative">
+          <div className="max-w-7xl mx-auto relative">
             <form onSubmit={handleAskQuestion} className="relative flex items-end shadow-sm border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 rounded-2xl overflow-hidden focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent transition-all">
               <textarea
                 value={question}
