@@ -378,6 +378,17 @@ def process_repository_task(repo_id: str, extract_dir: str):
     finally:
         _indexing_in_progress.discard(repo_id)
         db.close()
+        
+        # Clean up files after indexing is done or failed
+        logger.info(f"[index-{repo_id}] Cleaning up temporary files from uploads directory")
+        try:
+            if Path(extract_dir).exists():
+                shutil.rmtree(extract_dir, ignore_errors=True)
+            zip_path = Path("uploads") / f"{repo_id}.zip"
+            if zip_path.exists():
+                os.remove(zip_path)
+        except Exception as e:
+            logger.error(f"[index-{repo_id}] Error cleaning up files: {e}")
 
 
 @app.post("/index-code")
